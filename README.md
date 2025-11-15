@@ -1,4 +1,4 @@
-<h1>dotnet 运行时详解</h1>
+<h1>dotnet运行时, 知识备注</h1>
 
 1: 什么是 bundleProbe?
 .NET Core 3.0 之后支持“单文件发布”（PublishSingleFile）。
