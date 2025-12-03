@@ -31,7 +31,7 @@ GDB 里内置了 __jit_debug_register_code 钩子，一旦发现链表有新节�
 3: 通过在 VS工程中， 右键工程->属性->C/C++选项->预处理到文件：设置为true, 就可以输出 预处理文件，这样我们就可以看到完整的代码了
 
 <h1>4: JIT 详解：
-
+```
 PCODE MethodDesc::GetNativeCode()
 {
     WRAPPER_NO_CONTRACT;
@@ -57,3 +57,4 @@ PCODE MethodDesc::GetNativeCode()
 
     return GetStableEntryPoint(); //方法已经由 JIT 编译过，且没有 NativeCodeSlot（最常见的热路径），直接返回 GetStableEntryPoint()，也就是上次 JIT 生成的机器码址。
 }
+```
