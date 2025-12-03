@@ -55,5 +55,5 @@ PCODE MethodDesc::GetNativeCode()
     if (!HasStableEntryPoint() || HasPrecode())
         return NULL; //告诉调用者“我现在没有稳定入口，你必须走 precode”。 这正对应“第一次调用”或“方法尚未编译”的场景。
 
-    return GetStableEntryPoint(); //方法已经由 JIT 编译过，且没有 NativeCodeSlot（最常见的热路径），直接返回 GetStableEntryPoint()，也就是上次 JIT 生成的机器码地址。
+    return GetStableEntryPoint(); //方法已经由 JIT 编译过，且没有 NativeCodeSlot（最常见的热路径），直接返回 GetStableEntryPoint()，也就是上次 JIT 生成的机器码址。
 }
