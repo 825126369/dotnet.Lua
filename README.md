@@ -133,3 +133,6 @@ TailCallStubManager  尾调用指的是函数的最后一条语句是“调用�
 此时调用者（caller）的栈帧已经不再有用，可以被被调用者（callee）的栈帧立即复用，从而省掉一次压栈 / 弹栈的开销。
 如果编译器 / 运行时真的这么做了，就叫 尾调用优化（Tail Call Optimization，TCO） 或 尾递归优化（当 callee 正是 caller 自身时）
 
+VirtualCallStubManager : StubManager（简称 VCSM）是 CoreCLR 中 “虚派发 + 接口派发” 的 专属 StubManager。它只为 virtual 方法 和 interface 方法 调用服务，核心目标：
+把“对象运行时类型 → 目标方法地址”的映射做成可缓存的桩（stub）；让后续调用走最快路径（一条 cmp + jmp），失败才回退到运行时解析；对调试器、profiler 提供“这是虚桩”的身份识别与单步支持。
+
