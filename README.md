@@ -31,11 +31,14 @@ GDB 里内置了 __jit_debug_register_code 钩子，一旦发现链表有新节�
 
 (4) "unwind info" 是一组描述“函数在入口处把哪些寄存器压栈、栈帧大小如何变化”的元数据，供操作系统或运行时做栈回溯（stack unwinding）、异常传播和调试器堆栈遍历。它跟普通符号表不同：符号表只告诉你“函数入口地址”，而 unwind info 进一步告诉你“为了回到调用者，需要把哪些寄存器从栈里弹出、如何恢复 RSP/PC”。在 Windows PE/COFF 中，它表现为 .pdata 段里的 RUNTIME_FUNCTION → UNWIND_INFO 结构；
 
-(5) 汇编代码 *.S 与 *.asm 虽然 文件名几乎相同，但 后缀不同 → 两套构建系统、两套语法、两套平台。 它们并不是“重复”，而是 “同一份逻辑的两份实现”
-thunktemplates.S：对应 GCC 汇编语法：AT&T / ARM 统一汇编
-thunktemplates.asm： 对应 MSVC 汇编语法: Intel MASM
 
-<h1>4: JIT 详解：</h1>
+<h1>汇编 *.S *.asm 详解</h1>
+
+(1) *.S：对应 GCC 汇编语法：AT&T / ARM 统一汇编。  *.asm： 对应 MSVC 汇编语法: Intel MASM
+
+(2) LEAF_ENTRY	叶子函数： 会生成 尾部标签(类似 StubPrecodeCode_End), 供 C++ 侧计算桩长度;   NESTED_ENTRY	非叶子函数	需要标准 prolog/epilog
+
+<h1>JIT 详解</h1>
 
 ```
 PCODE MethodDesc::GetNativeCode()
