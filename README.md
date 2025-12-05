@@ -2,7 +2,22 @@
 
 官方运行时库: https://github.com/dotnet/runtime
 
-<h1>1: 基础知识：</h1>
+<h1>编译runtime，产生VS工程</h1>
+
+1： 选择 github Release 8.0 版本, 其他版本Build 全部失败。 使用 VS 内置 x64 命令行工具
+
+2：build-runtime.cmd -msbuild //默认无参数选项，只输出生成库Lib/dll文件, -msbuild选项 会输出VS工程。生成的VS工程目录路径: \runtime\artifacts\obj\coreclr\windows.x64.Debug\ide\
+
+3: 通过在 VS工程中， 右键工程->属性->C/C++选项->预处理到文件：设置为true, 就可以输出 预处理文件，这样我们就可以看到完整的代码了
+
+<h1>CLR虚拟机 核心入口方法： exports.cpp 提供了2个重要的方法</h1>
+
+(1) coreclr_initialize: 启动CLR虚拟机
+
+(2) coreclr_execute_assembly: 负责执行程序集
+
+
+<h1> 基础知识：</h1>
 
 (1) 什么是 bundleProbe?  .NET Core 3.0 之后支持“单文件发布”（PublishSingleFile）。
 单文件运行时，所有托管 DLL 都被打包进一个巨大的 exe，原生代码启动后需要知道“怎么在内存里把某个托管 DLL 抠出来”。
@@ -16,19 +31,9 @@ GDB 里内置了 __jit_debug_register_code 钩子，一旦发现链表有新节�
 
 (4) "unwind info" 是一组描述“函数在入口处把哪些寄存器压栈、栈帧大小如何变化”的元数据，供操作系统或运行时做栈回溯（stack unwinding）、异常传播和调试器堆栈遍历。它跟普通符号表不同：符号表只告诉你“函数入口地址”，而 unwind info 进一步告诉你“为了回到调用者，需要把哪些寄存器从栈里弹出、如何恢复 RSP/PC”。在 Windows PE/COFF 中，它表现为 .pdata 段里的 RUNTIME_FUNCTION → UNWIND_INFO 结构；
 
-<h1>2: CLR 启动，和执行程序集是分开的:  exports.cpp 提供了2个重要的方法</h1>
-
-(1) coreclr_initialize: 启动CLR虚拟机
-
-(2) coreclr_execute_assembly: 负责执行程序集
-
-<h1>3: 看过源码后，看不懂，原因是 宏太多太长了，但C++有输出宏处理后文件的功能，所以重新编译运行时</h1>
-
-1： 选择 github Release 8.0 版本, 其他版本Build 全部失败。 使用 VS 内置 x64 命令行工具
-
-2：build-runtime.cmd -msbuild //默认无参数选项，只输出生成库Lib/dll文件, -msbuild选项 会输出VS工程。生成的VS工程目录路径: \runtime\artifacts\obj\coreclr\windows.x64.Debug\ide\
-
-3: 通过在 VS工程中， 右键工程->属性->C/C++选项->预处理到文件：设置为true, 就可以输出 预处理文件，这样我们就可以看到完整的代码了
+(5) 汇编代码 *.S 与 *.asm 虽然 文件名几乎相同，但 后缀不同 → 两套构建系统、两套语法、两套平台。 它们并不是“重复”，而是 “同一份逻辑的两份实现”
+thunktemplates.S：对应 GCC 汇编语法：AT&T / ARM 统一汇编
+thunktemplates.asm： 对应 MSVC 汇编语法: Intel MASM
 
 <h1>4: JIT 详解：</h1>
 
@@ -90,3 +95,38 @@ CallDescrWorkerInternal 是纯原生汇编辅助例程，它的唯一职责是�
 用一段非常精简的 calling-convention 胶水直接跳转到目标机器码地址；
 目标函数返回后，再把返回值搬回 TransitionBlock，切回协作模式，返回到托管 caller。
 ——它本身既不会解释 IL，也不会触发 JIT，只是“帮你把参数、返回、GC 模式、栈对齐”全部铺好，然后一条 jmp/blr 把 PC 交给那个地址。
+
+StubManager: 在 .NET 运行时（.NET Runtime）中，StubManager 是一个内部（internal）、非公开的运行时组件，主要存在于 CoreCLR（即 .NET Core / .NET 5+ 的运行时实现）中，用于管理调用桩（stubs）的生成、缓存与生命周期。Stub 缓存管理：维护 MethodDesc/StubSig → stub 地址 的映射（哈希表或类似结构），避免重复生成。
+内存分配与释放：	在专用内存区域（如 CodeHeap 或 JitCodeHeap）中申请可执行内存，并在卸载 Assembly 或 AssemblyLoadContext 时安全回收。
+Stub 生命周期跟踪：	关联 stub 与所属模块/上下文，支持 ALC 卸载时自动清理（防止内存泄漏或悬空跳转）。
+调试与诊断支持：	提供调试器接口（如 ICorDebug）查询 stub 信息，用于断点、堆栈展开等
+
+ThePreStubManager:StubManager ：
+
+预分配 & 复用 PreStub 模板:	 在启动时为不同架构（x64/arm64）预生成少量固定格式的 stub 模板（如 PrecodeFixupThunk, DynamicHelperFixupThunk），避免每次分配都写入可执行内存  按需生成 PreStub 实例	当某个 MethodDesc 尚未 JIT，且其入口点（m_pEntry）被设为 PreStub 地址时，ThePreStubManager::GetPreStub() 返回一个指向该方法专属 prestub 的指针。
+Patch（热补丁）机制:  JIT 完成后，运行时通过 ThePreStubManager::ReplacePreStubWithRealCode() 将 prestub 内存中的跳转指令原子地修改为直接跳向 JIT 后的代码地址（例如 jmp [rip + offset] → jmp <real_method_addr>）。这是 .NET “冷启动优化”的关键一环。
+支持多种 prestub 类型:	根据方法特性选择不同 stub：
+• PRESTUB：普通非泛型方法
+• DYNAMICHELPERFIXUPPRESTUB：泛型/动态方法（需运行时解析类型）
+• IL_STUB_PRESTUB：IL stub（如委托调用封装）
+• UNMANAGED_EXPORT_PRESTUB：[UnmanagedCallersOnly] 导出函数的前置入口
+与 GC / 卸载协同:	确保 prestub 所占内存在其所属 Module 或 AssemblyLoadContext 卸载时被安全释放（尤其在 ALC 卸载场景下防止悬挂 stub）。
+
+PrecodeStubManager:StubManager  是创建/缓存/释放所有 Precode 实例的管理者。
+
+StubLinkStubManager:StubManager 为每个需“懒解析”的方法分配一个 StubLinkStub（桩链接桩），由 StubLinkStubManager 统一管理。
+
+ThunkHeapStubManager:StubManager 就是 .NET CoreCLR 为“动态生成小段可执行跳板”量身定做的内存池：按需分配 32/64 字节可执行槽位，用完即还，既快又不漏，是托管代码无缝调用原生世界的幕后功臣。
+
+JumpStubStubManager：StubManager  x64/IA64 的 jmp 指令只有 32-bit 相对偏移（±2 GB）。 CoreCLR 的代码段（JIT 后的机器码、NGEN 镜像、预编译 stub）可能被地址空间随机化（ASLR）放到 >2 GB 之外。这时如果 A 方法里要直接跳转到 B 方法，而两者相距 >2 GB，就必须在中间插一段“跳板”——先把绝对地址放进寄存器再 jmp reg。这段跳板就是 jump stub，由ExecutionManager::jumpStub() 在运行期实时生成，并由 JumpStubStubManager 统一分配、回收、识别。
+
+RangeSectionStubManager : StubManager 解决的问题： “给定一个指针，它是不是某类 stub？ 如果是，下一步该往哪走？” 如果每个查询都线性遍历所有 StubManager，性能不可接受；于是 CLR 把“地址→StubManager”做成一张范围表（RangeSection），并让一个统一的 RangeSectionStubManager 坐镇调度。
+
+ILStubManager : StubManager 它的作用可以一句话概括为：“让调试器、profiler 能认出‘这片代码是运行期动态生成的 IL stub’，并告诉它们下一步该怎么走。”
+
+InteropDispatchStubManager : StubManager 是 .NET CoreCLR 里专门负责 “通用互操作分发桩” 的 StubManager。 它只干三件事：认出 GenericComPlusCallStub、VarargPInvokeStub 和 GenericPInvokeCalliHelper 这三段手写汇编桩，然后告诉调试器 “这是互操作分发桩，下一步请走到 unmanaged 目标” 。
+
+TailCallStubManager  尾调用指的是函数的最后一条语句是“调用另一个函数”并且“直接用它的返回值作为自己的返回值”。
+此时调用者（caller）的栈帧已经不再有用，可以被被调用者（callee）的栈帧立即复用，从而省掉一次压栈 / 弹栈的开销。
+如果编译器 / 运行时真的这么做了，就叫 尾调用优化（Tail Call Optimization，TCO） 或 尾递归优化（当 callee 正是 caller 自身时）
+
