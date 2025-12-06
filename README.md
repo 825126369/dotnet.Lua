@@ -148,7 +148,7 @@ ThisPtrRetBufPrecode：处理返回值类型的开放实例委托的调用约定
 
 <h2>JIT 流程图</h2>
 
-Precode::Init => GetPreStubEntryPoint => ThePreStubAMD64.asm[ThePreStub] => prestub.cpp[PreStubWorker] => prestub.cpp[MethodDesc::DoPrestub] => prestub.cpp[MethodDesc::PrepareInitialCode]
+(1) Precode::Init => GetPreStubEntryPoint 返回代码点 ThePreStubAMD64.asm[ThePreStub]
 
-JitILStub => MethodDesc::PrepareInitialCode =>
+(2) 从ThePreStubAMD64.asm[ThePreStub] => prestub.cpp[PreStubWorker] => prestub.cpp[MethodDesc::DoPrestub] => prestub.cpp[MethodDesc::PrepareInitialCode]
 
