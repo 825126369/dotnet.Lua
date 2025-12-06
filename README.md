@@ -136,9 +136,19 @@ TailCallStubManager  尾调用指的是函数的最后一条语句是“调用�
 VirtualCallStubManager : StubManager（简称 VCSM）是 CoreCLR 中 “虚派发 + 接口派发” 的 专属 StubManager。它只为 virtual 方法 和 interface 方法 调用服务，核心目标：
 把“对象运行时类型 → 目标方法地址”的映射做成可缓存的桩（stub）；让后续调用走最快路径（一条 cmp + jmp），失败才回退到运行时解析；对调试器、profiler 提供“这是虚桩”的身份识别与单步支持。
 
+<h2>Precode 类型</h2>
+
+StubPrecode：基础类型，加载 MethodDesc 并跳转
+
+FixupPrecode：用于 NGen 映像中的方法修复，省略加载 MethodDesc 以提升性能
+
+NDirectImportPrecode：用于 P/Invoke 的延迟绑定
+ 
+ThisPtrRetBufPrecode：处理返回值类型的开放实例委托的调用约定转换
+
 <h2>JIT 流程图</h2>
 
-ThePreStubAMD64.asm => PreStubWorker => MethodDesc::DoPrestub => MethodDesc::PrepareInitialCode
+Precode::Init => GetPreStubEntryPoint => ThePreStubAMD64.asm[ThePreStub] => prestub.cpp[PreStubWorker] => prestub.cpp[MethodDesc::DoPrestub] => prestub.cpp[MethodDesc::PrepareInitialCode]
 
 JitILStub => MethodDesc::PrepareInitialCode =>
 
