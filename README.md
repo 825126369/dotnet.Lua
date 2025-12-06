@@ -31,6 +31,8 @@ GDB 里内置了 __jit_debug_register_code 钩子，一旦发现链表有新节�
 
 (4) "unwind info" 是一组描述“函数在入口处把哪些寄存器压栈、栈帧大小如何变化”的元数据，供操作系统或运行时做栈回溯（stack unwinding）、异常传播和调试器堆栈遍历。它跟普通符号表不同：符号表只告诉你“函数入口地址”，而 unwind info 进一步告诉你“为了回到调用者，需要把哪些寄存器从栈里弹出、如何恢复 RSP/PC”。在 Windows PE/COFF 中，它表现为 .pdata 段里的 RUNTIME_FUNCTION → UNWIND_INFO 结构；
 
+(5) EN_C_SUPPORTED（注意：正确宏名是 ENC_SUPPORTED，全大写，常写作 #define ENC_SUPPORTED 1）是 .NET 运行时（CoreCLR / .NET Runtime）中一个编译期开关宏（build-time feature flag），用于控制是否启用 Edit and Continue（EnC）—— 即“编辑并继续”调试功能 的底层支持。
+
 
 <h1>汇编 *.S *.asm 详解</h1>
 
@@ -146,9 +148,26 @@ NDirectImportPrecode：用于 P/Invoke 的延迟绑定
  
 ThisPtrRetBufPrecode：处理返回值类型的开放实例委托的调用约定转换
 
+<h2>MethodTableBuilder</h2>
+MethodTableBuilder 的唯一使命就是“把元数据里的一堆 TypeDef/MethodDef 记录变成一块真正可运行的 MethodTable 内存。可以把整个构建过程看成一条流水线：
+拿到待建类型的元数据 token、父类句柄、接口列表、泛型实参等原料；
+在 BuildMethodTableThrowing() 里按顺序做 7 件大事：
+计算对象大小、字段布局、GC 描述符；
+为所有方法分配 MethodDescChunk，决定是否需要 Precode；
+生成虚方法表（VtableIndir 数组），处理 newslot/override；
+把接口映射表 (InterfaceMap) 压平；
+填 EEClass 的静态字段描述、线程静态偏移；
+生成 GCInfo 的 Series；
+最后把 MethodTable* 返回给 ClassLoader，由 LoadLevel 系统继续驱动到 CLASS_LOADED 状态。
+过程中任何一步失败（如循环继承、重复接口、泛型约束冲突）都直接 ThrowHR 回退，不会留下半成品的 MethodTable
+
 <h2>JIT 流程图</h2>
 
-(1) Precode::Init => GetPreStubEntryPoint 返回代码点 ThePreStubAMD64.asm[ThePreStub]
+(1) 设置 PCode 指向 ThePreStub 方法
 
-(2) callhelpers.h[CallTargetWorker] => CallDescrWorkerAMD64.asm[CallDescrWorkerInternal] (没有JIT的时候)=> ThePreStubAMD64.asm[ThePreStub] => prestub.cpp[PreStubWorker] => prestub.cpp[MethodDesc::DoPrestub] => prestub.cpp[MethodDesc::PrepareInitialCode]
+Assembly::GetEntryPoint() => ClassLoader::LoadTypeHandleForTypeKey => ClassLoader::CreateTypeHandleForTypeDefThrowing => MethodTableBuilder::BuildMethodTableThrowing => Precode::Init => GetPreStubEntryPoint 返回代码点 ThePreStubAMD64.asm[ThePreStub] 
+
+(2) 调用 ThePreStub 方法,进行执行 JIT/解释器
+
+callhelpers.h[CallTargetWorker] => CallDescrWorkerAMD64.asm[CallDescrWorkerInternal] (没有JIT的时候)=> ThePreStubAMD64.asm[ThePreStub] => prestub.cpp[PreStubWorker] => prestub.cpp[MethodDesc::DoPrestub] => prestub.cpp[MethodDesc::PrepareInitialCode]
 
