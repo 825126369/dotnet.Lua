@@ -40,36 +40,9 @@ GDB 里内置了 __jit_debug_register_code 钩子，一旦发现链表有新节�
 
 (2) LEAF_ENTRY	叶子函数： 会生成 尾部标签(类似 StubPrecodeCode_End), 供 C++ 侧计算桩长度;   NESTED_ENTRY	非叶子函数	需要标准 prolog/epilog
 
-<h1>JIT 详解</h1>
+<h1>JIT [clrjit.dll] 详解</h1>
 
-```
-PCODE MethodDesc::GetNativeCode()
-{
-    WRAPPER_NO_CONTRACT;
-    SUPPORTS_DAC;
-    _ASSERTE(!IsDefaultInterfaceMethod() || HasNativeCodeSlot());
-    if (HasNativeCodeSlot())
-    {
-        // When profiler is enabled, profiler may ask to rejit a code even though we
-        // we have ngen code for this MethodDesc.  (See MethodDesc::DoPrestub).
-        // This means that *ppCode is not stable. It can turn from non-zero to zero.
-        PTR_PCODE ppCode = GetAddrOfNativeCodeSlot();
-        PCODE pCode = *ppCode;
-
-#ifdef TARGET_ARM
-        if (pCode != NULL)
-            pCode |= THUMB_CODE;
-#endif
-        return pCode; //此时函数要么已经由 NGen 编译好，要么由 ReJIT 重新编译过，不需要再走 JIT。
-    }
-
-    if (!HasStableEntryPoint() || HasPrecode())
-        return NULL; //告诉调用者“我现在没有稳定入口，你必须走 precode”。 这正对应“第一次调用”或“方法尚未编译”的场景。
-
-    return GetStableEntryPoint(); //方法已经由 JIT 编译过，且没有 NativeCodeSlot（最常见的热路径），直接返回 GetStableEntryPoint()，也就是上次 JIT 生成的机器码址。
-}
-```
-
+<h2>一些宏定义的意思</h2>
 FEATURE_MULTICOREJIT（又称 Multicore JIT）是 .NET Framework 4.5 引入、CoreCLR 继续保留的一项启动加速技术：
 利用多核 CPU，在应用启动阶段把“接下来大概率要编译的方法”提前放到后台线程并行编译，从而削掉主线程的 JIT 时间，让程序更快进入稳定状态。它不改变 prestub → JIT 的基本流程，只是提前把活干完，让主线程走到 prestub 时常常能“捡现成”。
 基本思想
@@ -161,7 +134,7 @@ MethodTableBuilder 的唯一使命就是“把元数据里的一堆 TypeDef/Meth
 最后把 MethodTable* 返回给 ClassLoader，由 LoadLevel 系统继续驱动到 CLASS_LOADED 状态。
 过程中任何一步失败（如循环继承、重复接口、泛型约束冲突）都直接 ThrowHR 回退，不会留下半成品的 MethodTable
 
-<h2>JIT 流程图</h2>
+<h2>JIT 外围调用 流程图</h2>
 
 (1) 设置 PCode 指向 ThePreStub 方法
 
@@ -193,3 +166,6 @@ prestub.cpp[MethodDesc::PrepareInitialCode] =>
 
 jitinterface.cpp[UnsafeJitFunction]
 
+<h2>JIT [clrjit.dll] 内部调用 流程图</h2>
+
+ee_il_dll.cpp[jitStartup] => ee_il_dll.cpp[CILJit::compileMethod]
