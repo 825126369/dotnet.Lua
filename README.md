@@ -185,7 +185,7 @@ CallDescrWorkerAMD64.asm[CallDescrWorkerInternal] (没有JIT的时候)=>
 
 ThePreStubAMD64.asm[ThePreStub] => 
 
-restub.cpp[PreStubWorker] => 
+prestub.cpp[PreStubWorker] => 
 
 prestub.cpp[MethodDesc::DoPrestub] => 
 
