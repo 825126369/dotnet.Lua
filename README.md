@@ -165,9 +165,31 @@ MethodTableBuilder 的唯一使命就是“把元数据里的一堆 TypeDef/Meth
 
 (1) 设置 PCode 指向 ThePreStub 方法
 
-Assembly::GetEntryPoint() => ClassLoader::LoadTypeHandleForTypeKey => ClassLoader::CreateTypeHandleForTypeDefThrowing => MethodTableBuilder::BuildMethodTableThrowing => Precode::Init => GetPreStubEntryPoint 返回代码点 ThePreStubAMD64.asm[ThePreStub] 
+Assembly::GetEntryPoint() => 
+
+ClassLoader::LoadTypeHandleForTypeKey => 
+
+ClassLoader::CreateTypeHandleForTypeDefThrowing => 
+
+MethodTableBuilder::BuildMethodTableThrowing => 
+
+Precode::Init => 
+
+GetPreStubEntryPoint 返回代码点 ThePreStubAMD64.asm[ThePreStub] 
 
 (2) 调用 ThePreStub 方法,进行执行 JIT/解释器
 
-callhelpers.h[CallTargetWorker] => CallDescrWorkerAMD64.asm[CallDescrWorkerInternal] (没有JIT的时候)=> ThePreStubAMD64.asm[ThePreStub] => prestub.cpp[PreStubWorker] => prestub.cpp[MethodDesc::DoPrestub] => prestub.cpp[MethodDesc::PrepareInitialCode]
+callhelpers.h[CallTargetWorker] => 
+
+CallDescrWorkerAMD64.asm[CallDescrWorkerInternal] (没有JIT的时候)=> 
+
+ThePreStubAMD64.asm[ThePreStub] => 
+
+restub.cpp[PreStubWorker] => 
+
+prestub.cpp[MethodDesc::DoPrestub] => 
+
+prestub.cpp[MethodDesc::PrepareInitialCode] => 
+
+jitinterface.cpp[UnsafeJitFunction]
 
