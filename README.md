@@ -168,4 +168,4 @@ jitinterface.cpp[UnsafeJitFunction]
 
 <h2>JIT [clrjit.dll] 内部调用 流程图</h2>
 
-ee_il_dll.cpp[jitStartup] => ee_il_dll.cpp[CILJit::compileMethod]
+ee_il_dll.cpp[jitStartup] => ee_il_dll.cpp[CILJit::compileMethod] => [compiler.cpp]Compiler::compCompile
