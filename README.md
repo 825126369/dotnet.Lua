@@ -43,36 +43,21 @@ GDB 里内置了 __jit_debug_register_code 钩子，一旦发现链表有新节�
 <h1>JIT [clrjit.dll] 详解</h1>
 
 <h2>一些宏定义的意思</h2>
+
 FEATURE_MULTICOREJIT（又称 Multicore JIT）是 .NET Framework 4.5 引入、CoreCLR 继续保留的一项启动加速技术：
 利用多核 CPU，在应用启动阶段把“接下来大概率要编译的方法”提前放到后台线程并行编译，从而削掉主线程的 JIT 时间，让程序更快进入稳定状态。它不改变 prestub → JIT 的基本流程，只是提前把活干完，让主线程走到 prestub 时常常能“捡现成”。
-基本思想
-第一次运行（Recording）
-CLR 把启动路径上所有触发的 MethodDesc 按顺序写进 %LocalAppData%\<yourapp>\*.profile 文件。
-后续运行（Playback）
-进程一启动就 StartProfile，CLR 在后台线程里按 profile 顺序批量调用 MakeJitWorker(..., CORJIT_FLG_MCJIT_BACKGROUND)，
-把方法先编译好并塞进 MulticoreJitCodeStorage。
-主线程真正调用到某个方法时，prestub → PreStubWorker → GetNativeCode() 会优先去 MulticoreJitCodeStorage 里查，
-如果已有现成代码，直接 SetNativeCodeInterlocked 并返回，几乎 0 等待；
-若还没轮到后台编，就走常规 JIT，只是现在编译队列已被“预热”，等待时间也大大缩短。
+
+FEATURE_MULTIREG_RET 并不是某条汇编指令，而是 CoreCLR-JIT 在 编译期 使用的一个 条件编译宏（feature flag），用来区分“当前目标平台是否支持把结构体或长整型拆到多个寄存器返回”。
 
 FEATURE_READYTORON（简称 R2R）是 .NET Core 3.0 正式引入、.NET 5+ 默认开启的预编译（AOT）技术：
 在 build 阶段就把 IL 编译成目标平台的机器码，并嵌入同一 PE 文件（.dll/.exe）的专用区域；
 运行时跳过 JIT，直接映射到 ReadyToRun 代码，从而把启动时间和JIT 内存占用都压到最低。
 它与 prestub 和 Multicore JIT 是互补关系：有 R2R 就用 R2R，没有才回退到 prestub → JIT。
-基本思想
-编译期（Crossgen2）
-把 IL + 元数据 → 目标平台机器码，生成 .r2r section 和 READYTORUN_HEADER。
-运行期（CoreCLR）
-加载模块时，ReadyToRunInfo::Initialize 把 .r2r section 映射到内存；
-方法第一次被调用，prestub → PreStubWorker → MethodDesc::DoPrestub
-会优先去 R2R 哈希表里查，命中就直接返回机器码地址，不再调用 JIT；
-若缺失（泛型特化、版本 bubble 外等）才回退到传统 JIT。
 
 CallDescrWorkerInternal 是纯原生汇编辅助例程，它的唯一职责是：
 按预先填好的 TransitionBlock（参数槽、返回地址、寄存器镜像）把线程从协作模式切到抢占模式；
 用一段非常精简的 calling-convention 胶水直接跳转到目标机器码地址；
 目标函数返回后，再把返回值搬回 TransitionBlock，切回协作模式，返回到托管 caller。
-——它本身既不会解释 IL，也不会触发 JIT，只是“帮你把参数、返回、GC 模式、栈对齐”全部铺好，然后一条 jmp/blr 把 PC 交给那个地址。
 
 StubManager: 在 .NET 运行时（.NET Runtime）中，StubManager 是一个内部（internal）、非公开的运行时组件，主要存在于 CoreCLR（即 .NET Core / .NET 5+ 的运行时实现）中，用于管理调用桩（stubs）的生成、缓存与生命周期。Stub 缓存管理：维护 MethodDesc/StubSig → stub 地址 的映射（哈希表或类似结构），避免重复生成。
 内存分配与释放：	在专用内存区域（如 CodeHeap 或 JitCodeHeap）中申请可执行内存，并在卸载 Assembly 或 AssemblyLoadContext 时安全回收。
@@ -124,15 +109,6 @@ ThisPtrRetBufPrecode：处理返回值类型的开放实例委托的调用约定
 <h2>MethodTableBuilder</h2>
 MethodTableBuilder 的唯一使命就是“把元数据里的一堆 TypeDef/MethodDef 记录变成一块真正可运行的 MethodTable 内存。可以把整个构建过程看成一条流水线：
 拿到待建类型的元数据 token、父类句柄、接口列表、泛型实参等原料；
-在 BuildMethodTableThrowing() 里按顺序做 7 件大事：
-计算对象大小、字段布局、GC 描述符；
-为所有方法分配 MethodDescChunk，决定是否需要 Precode；
-生成虚方法表（VtableIndir 数组），处理 newslot/override；
-把接口映射表 (InterfaceMap) 压平；
-填 EEClass 的静态字段描述、线程静态偏移；
-生成 GCInfo 的 Series；
-最后把 MethodTable* 返回给 ClassLoader，由 LoadLevel 系统继续驱动到 CLASS_LOADED 状态。
-过程中任何一步失败（如循环继承、重复接口、泛型约束冲突）都直接 ThrowHR 回退，不会留下半成品的 MethodTable
 
 <h2>JIT 外围调用 流程图</h2>
 
@@ -168,4 +144,14 @@ jitinterface.cpp[UnsafeJitFunction]
 
 <h2>JIT [clrjit.dll] 内部调用 流程图</h2>
 
-ee_il_dll.cpp[jitStartup] => ee_il_dll.cpp[CILJit::compileMethod] => [compiler.cpp]Compiler::compCompile
+ee_il_dll.cpp[jitStartup] => ee_il_dll.cpp[CILJit::compileMethod] => [compiler.cpp]Compiler::compCompile => [codegencommon.cpp]CodeGen::genGenerateCode
+
+<h2>DoPhase各个阶段</h2>
+
+fgTransformPatchpoints : 就是 Tier-1 编译把占位块换成真正“逃生跳板” 的局部改写阶段，确保 OSR 既能热替换，也能安全回退。
+
+fgTransformIndirectCalls ：把看不见目标的 call [reg] 变成 if-else 双路径：热路径直调用，冷路径保持间接，既提速又保正确，是 PGO/静态启发式落地的关键一步。
+
+fgMorphInit = “Morph 大循环前的全局缓存与开关集中初始化”，本身不改 IR，只负责把后面高频访问的常量/掩码/缓存一次性填好，让几十万次递归 fgMorphTree 跑得更快、分支更少。
+
+fgInline = “在 Morph 期把符合条件的 call 整个展开成调用方 IR 子图”，彻底消除调用开销，为后续所有全局优化打开更大空间，是 .NET JIT 拿到 “零调用开销 + 跨过程常量折叠” 最关键的一刀。
