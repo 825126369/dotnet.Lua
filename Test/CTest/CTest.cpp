@@ -1,111 +1,103 @@
-﻿// CTest.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-//
-#include <cstdarg>
-#include <cstdio>
-#include <iostream>
+﻿#include <iostream>
 #include <vector>
-#include <format>
+#include <cstdio>
+#include <string>
+#include <cctype>
+#include <stdexcept>
 
-void assert(bool bTrue);
-std::string strformat(const char* fmt, ...);
-void QuickSort(std::vector<int>& mArray);
-void QuickSort(std::vector<int>& mArray, int nBegin, int nEnd);
+class resOpInfo {
+public:
+    int nOpState;
+    int nOpValue;
+    int nSheBeiID = -1;
 
-int main()
+    resOpInfo(int nOpState, int nOpValue) {
+        this->nOpState = nOpState;
+        this->nOpValue = nOpValue;
+    }
+};
+
+void MainLogic(std::vector<resOpInfo*>& mOpList, std::vector<int>& mSheBeiResList) 
 {
-    std::cout << "Hello World!\n";
+    for (int i = 0; i < mOpList.size(); i++) {
+        if (mOpList[i]->nOpState == 1) {
+            int nMinRemainSpace = 9999999;
+            int nTargetIndex = -1;
+            for (int j = 0; j < mSheBeiResList.size(); j++) {
+                if (mSheBeiResList[j] > mOpList[i]->nOpValue) {
+                    if (mSheBeiResList[j] - mOpList[i]->nOpValue < nMinRemainSpace) {
+                        nMinRemainSpace = mSheBeiResList[j] - mOpList[i]->nOpValue;
+                        nTargetIndex = j;
+                    }
+                }
+            }
 
-    std::vector<int> mArray = {0, 1, 2, 3, 4, 5};
-    QuickSort(mArray);
-    for (int i = 0; i < mArray.size(); i++)
-    {
-        std::cout << strformat("%d ", mArray[i]);
-    }
-    std::cout << "\n";
-
-    mArray = { 5, 4, 3, 2, 1, 0 };
-    QuickSort(mArray);
-    for (int i = 0; i < mArray.size(); i++)
-    {
-        std::cout << strformat("%d ", mArray[i]);
-    }
-    std::cout << "\n";
-
-    mArray = { 1, 5, 2, 4, 3, 0 };
-    QuickSort(mArray);
-    for (int i = 0; i < mArray.size(); i++)
-    {
-        std::cout << strformat("%d ", mArray[i]);
-    }
-    std::cout << "\n";
-}
-
-
-
-void QuickSort(std::vector<int>& mArray)
-{
-    QuickSort(mArray, 0, mArray.size() - 1);
-}
-
-void QuickSort(std::vector<int>& mArray, int nBegin, int nEnd)
-{
-    if (nBegin >= nEnd)
-    {
-        return;
-    }
-
-    int Key = mArray[nBegin];
-    int nBeginIndex = nBegin;
-    int nEndIndex = nEnd;
-    while (nBeginIndex < nEndIndex)
-    {
-        while (nBeginIndex < nEndIndex && mArray[nEndIndex] >= Key)
-        {
-            nEndIndex--;
+            if (nTargetIndex >= 0) {
+                mOpList[i]->nSheBeiID = nTargetIndex;
+                mSheBeiResList[nTargetIndex] -= mOpList[i]->nOpValue;
+                std::cout << nTargetIndex + 1 << " ";
+            }
+            else {
+                std::cout << 0 << " ";
+            }
         }
+        else if (mOpList[i]->nOpState == 2) {
+            resOpInfo* nUseOpInfo = mOpList[i - 1];
 
-        if (nBeginIndex < nEndIndex)
-        {
-            mArray[nBeginIndex] = mArray[nEndIndex];
+            int nTargetIndex = nUseOpInfo->nSheBeiID;
+            if (nTargetIndex >= 0) {
+                mSheBeiResList[nTargetIndex] += mOpList[i]->nOpValue;
+                mOpList[i]->nSheBeiID = -1;
+            }
         }
-
-        while (nBeginIndex < nEndIndex && mArray[nBeginIndex] <= Key)
-        {
-            nBeginIndex++;
-        }
-
-        if (nBeginIndex < nEndIndex)
-        {
-            mArray[nEndIndex] = mArray[nBeginIndex];
-        }
-    }
-    
-    mArray[nBeginIndex] = Key;
-    assert(nBeginIndex == nEndIndex);
-    if (nBegin < nEnd)
-    {
-        QuickSort(mArray, nBegin, nBeginIndex - 1);
-        QuickSort(mArray, nBeginIndex + 1, nEnd);
-    }
-
-}
-
-void assert(bool bTrue)
-{
-    if (!bTrue)
-    {
-        std::cerr << "assert failed" << std::endl;
     }
 }
 
-std::string strformat(const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    int len = std::snprintf(nullptr, 0, fmt, args);
-    char* buffer = new char[len];
-    std::vsnprintf(buffer, len, fmt, args);
-    va_end(args);
+std::vector<std::string> split_ws(const std::string& s) {
+    std::vector<std::string> v;
+    auto p = s.begin(), end = s.end();
+    while (p != end) {
+        while (p != end && std::isspace(static_cast<unsigned char>(*p))) ++p;
+        if (p == end) break;
+        auto q = p;
+        while (q != end && !std::isspace(static_cast<unsigned char>(*q))) ++q;
+        v.emplace_back(p, q);
+        p = q;
+    }
+    return v;
+}
 
-    return std::string(buffer);
+int main() {
+    std::vector<int> mSheBeiResList = {};
+    std::vector<resOpInfo*> mOpList = {};
+    int nSheBeiCount, nOpCount;
+    int nOpState, nOpValue;
+
+
+    std::string resList;
+    int n, a, b;
+    char douhao;
+    std::cin >> nSheBeiCount >> nOpCount;
+    std::getline(std::cin, resList);
+    std::getline(std::cin, resList);
+
+    auto mStrList = split_ws(resList);
+    for (int i = 0; i < std::min((int)mStrList.size(), nSheBeiCount); i++) {
+        mSheBeiResList.push_back(std::stoi(mStrList[i]));
+    }
+
+    while (nOpCount-- > 0) {
+        std::cin >> nOpState >> nOpValue;
+        mOpList.push_back(new resOpInfo(nOpState, nOpValue));
+        nOpState = 0;
+        nOpValue = 0;
+    }
+
+    std::cout << std::endl;
+    for (int i = 0; i < mSheBeiResList.size(); i++) {
+        std::cout << mSheBeiResList[i] << " ";
+    }
+
+    MainLogic(mOpList, mSheBeiResList);
+
 }
