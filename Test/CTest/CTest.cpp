@@ -15,7 +15,23 @@ int main()
 {
     std::cout << "Hello World!\n";
 
-    std::vector<int> mArray = {1, 3, 0, -1, -1, 10};
+    std::vector<int> mArray = {0, 1, 2, 3, 4, 5};
+    QuickSort(mArray);
+    for (int i = 0; i < mArray.size(); i++)
+    {
+        std::cout << strformat("%d ", mArray[i]);
+    }
+    std::cout << "\n";
+
+    mArray = { 5, 4, 3, 2, 1, 0 };
+    QuickSort(mArray);
+    for (int i = 0; i < mArray.size(); i++)
+    {
+        std::cout << strformat("%d ", mArray[i]);
+    }
+    std::cout << "\n";
+
+    mArray = { 1, 5, 2, 4, 3, 0 };
     QuickSort(mArray);
     for (int i = 0; i < mArray.size(); i++)
     {
@@ -43,33 +59,32 @@ void QuickSort(std::vector<int>& mArray, int nBegin, int nEnd)
     int nEndIndex = nEnd;
     while (nBeginIndex < nEndIndex)
     {
-        while (nBeginIndex < nEndIndex && mArray[nEndIndex--] >= Key)
+        while (nBeginIndex < nEndIndex && mArray[nEndIndex] >= Key)
         {
-
+            nEndIndex--;
         }
 
         if (nBeginIndex < nEndIndex)
         {
             mArray[nBeginIndex] = mArray[nEndIndex];
-            mArray[nEndIndex] = Key;
         }
 
-        while (nBeginIndex < nEndIndex && mArray[nBeginIndex++] <= Key)
+        while (nBeginIndex < nEndIndex && mArray[nBeginIndex] <= Key)
         {
-
+            nBeginIndex++;
         }
 
         if (nBeginIndex < nEndIndex)
         {
             mArray[nEndIndex] = mArray[nBeginIndex];
-            mArray[nBeginIndex] = Key;
         }
     }
     
+    mArray[nBeginIndex] = Key;
     assert(nBeginIndex == nEndIndex);
     if (nBegin < nEnd)
     {
-        QuickSort(mArray, nBegin, nBeginIndex);
+        QuickSort(mArray, nBegin, nBeginIndex - 1);
         QuickSort(mArray, nBeginIndex + 1, nEnd);
     }
 
