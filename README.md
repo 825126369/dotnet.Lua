@@ -146,7 +146,7 @@ jitinterface.cpp[UnsafeJitFunction]
 
 ee_il_dll.cpp[jitStartup] => ee_il_dll.cpp[CILJit::compileMethod] => [compiler.cpp]Compiler::compCompile => [codegencommon.cpp]CodeGen::genGenerateCode
 
-<h2>DoPhase各个阶段</h2>
+<h2>ClrJit DoPhase各个阶段</h2>
 
 fgTransformPatchpoints : 就是 Tier-1 编译把占位块换成真正“逃生跳板” 的局部改写阶段，确保 OSR 既能热替换，也能安全回退。
 
@@ -155,3 +155,12 @@ fgTransformIndirectCalls ：把看不见目标的 call [reg] 变成 if-else 双�
 fgMorphInit = “Morph 大循环前的全局缓存与开关集中初始化”，本身不改 IR，只负责把后面高频访问的常量/掩码/缓存一次性填好，让几十万次递归 fgMorphTree 跑得更快、分支更少。
 
 fgInline = “在 Morph 期把符合条件的 call 整个展开成调用方 IR 子图”，彻底消除调用开销，为后续所有全局优化打开更大空间，是 .NET JIT 拿到 “零调用开销 + 跨过程常量折叠” 最关键的一刀。
+
+
+<h2>苹果 禁止JIT 的窍门</h2>
+
+Compiler::eeAllocMem 拿到的内存页已被内核标成可执行，所以JIT 往里写入机器码后 CPU 能直接跳转过去。
+
+普通 new/malloc 只给 RW 权限，往里写指令会立即触发 DEP/权限错误——这是二者最本质的区别。
+
+这也是苹果禁止JIT窍门，让内核标为可执行内存的路堵死，JIT也就堵死了。
