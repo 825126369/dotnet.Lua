@@ -159,6 +159,8 @@ fgInline = “在 Morph 期把符合条件的 call 整个展开成调用方 IR �
 
 <h2>苹果 禁止JIT 的窍门</h2>
 
+VirtualAlloc = Windows 内核级“整页内存”分配器，64 KB 对齐，可赋 RX/RWX，专为 JIT、大对象、Guard Page 设计；日常小对象请继续用 malloc/new。
+
 Compiler::eeAllocMem 拿到的内存页已被内核标成可执行，所以JIT 往里写入机器码后 CPU 能直接跳转过去。
 
 普通 new/malloc 只给 RW 权限，往里写指令会立即触发 DEP/权限错误——这是二者最本质的区别。
