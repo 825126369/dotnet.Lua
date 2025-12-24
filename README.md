@@ -177,7 +177,7 @@ emit 阶段把指令攒进组 → 输出阶段按组复制到最终可执行内�
 
 emitSavIG：本质就是往可执行内存里现场写机器码——JIT 的核心动作。
 
-<h1>GC clrgc.dll 详解</h1>
+<h1>GC [clrgc.dll] 详解</h1>
 
 
 
