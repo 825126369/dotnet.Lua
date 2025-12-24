@@ -2,6 +2,8 @@
 
 官方运行时库: https://github.com/dotnet/runtime
 
+本地安装目录: C:\Program Files\dotnet\shared\Microsoft.NETCore.App\
+
 <h1>编译runtime，产生VS工程</h1>
 
 1： 选择 github Release 8.0 版本, 其他版本Build 全部失败。 使用 VS 内置 x64 命令行工具
@@ -174,3 +176,9 @@ insGroup 是 RyuJIT emitter 里最底层的 代码块 单位：它把连续发�
 emit 阶段把指令攒进组 → 输出阶段按组复制到最终可执行内存 → 重定位时按组修正跳转偏移。
 
 emitSavIG：本质就是往可执行内存里现场写机器码——JIT 的核心动作。
+
+<h1>GC clrgc.dll 详解</h1>
+
+
+
+
