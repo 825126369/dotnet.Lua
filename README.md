@@ -179,6 +179,8 @@ emitSavIG：本质就是往可执行内存里现场写机器码——JIT 的核�
 
 <h1>GC [clrgc.dll] 详解</h1>
 
+GC初始化方法: ceemain.cpp[InitializeGarbageCollector] => gcload.cpp[GC_Initialize]
+
 
 
 
